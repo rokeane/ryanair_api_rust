@@ -167,6 +167,29 @@ pub async fn get_return_flights(
     return Ok(FlightResponse { fares: res });
 }
 
+
+// return the cheapest return flights departing day_from and returning on day_to
+// TODO: Enable threadpool to handle multiple requests concurrently
+pub async fn get_cheapest_return_flights_from_weekdays(
+    source: &str, 
+    dest: &str, 
+    from: &str, 
+    to: &str, 
+    day_from: &str,
+    day_to: &str,
+) -> Result<FlightResponse, Box<dyn std::error::Error>> {
+
+    let mut res = Vec::new();
+    let dates = get_weekday_combinations(from,to,day_from,day_to);
+
+    for (outbound,inbound) in dates {
+       let mut return_flight = get_return_flights(&source, &dest, &inbound, &outbound).await?.fares;
+       res.append(&mut return_flight);
+    }
+
+    return Ok(FlightResponse { fares: res });
+}
+
 pub fn get_weekday_combinations(
     from: &str,
     to: &str,
