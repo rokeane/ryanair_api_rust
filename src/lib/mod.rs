@@ -1,12 +1,12 @@
 use serde::{Deserialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::{fmt, thread};
+use std::{fmt, thread, time};
 use chrono::prelude::*;
 use chrono::{NaiveDate, TimeDelta, Weekday};
-mod threadpool;
+use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct Airport {
     #[serde(rename = "countryName")]
     country_name: String,
@@ -18,7 +18,7 @@ struct Airport {
     city: City,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct City {
     name: String,
     code: String,
@@ -26,12 +26,12 @@ struct City {
     country_code: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct Flight {
     outbound: Outbound,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct Outbound {
     // Add other fields as needed
     #[serde(rename = "departureAirport")]
@@ -53,7 +53,7 @@ struct Outbound {
     price_updated: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct Price {
     value: f64,
     #[serde(rename = "valueMainUnit")]
@@ -66,13 +66,13 @@ struct Price {
     currency_symbol: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct Fare {
     outbound: Outbound,
     summary: Summary,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct Summary {
     price: Price,
     #[serde(rename = "previousPrice")]
@@ -87,8 +87,7 @@ pub struct FlightResponse {
 impl fmt::Display for FlightResponse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.fares.is_empty() {
-            write!(f, "Sorry. No fares are available.");
-            return Ok(());
+            return write!(f, "Sorry. No fares are available.");
         }
         for fare in &self.fares {
             writeln!(
@@ -170,7 +169,7 @@ pub async fn get_return_flights(
 
 
 // return the cheapest return flights departing day_from and returning on day_to
-// TODO: Enable threadpool to handle multiple requests concurrently
+// TODO: limit the number of threads that can be spawned simultaneously
 pub async fn get_cheapest_return_flights_from_weekdays(
     source: &str, 
     dest: &str, 
@@ -180,15 +179,36 @@ pub async fn get_cheapest_return_flights_from_weekdays(
     day_to: &str,
 ) -> Result<FlightResponse, Box<dyn std::error::Error>> {
 
-    let mut res = Vec::new();
+    let res = Arc::new(Mutex::new(Vec::new()));
     let dates = get_weekday_combinations(from,to,day_from,day_to);
 
-    for (outbound,inbound) in dates {
-       let mut return_flight = get_return_flights(&source, &dest, &inbound, &outbound).await?.fares;
-       res.append(&mut return_flight);
-    }
+    let mut handles = vec![];
 
-    return Ok(FlightResponse { fares: res });
+    for (outbound,inbound) in dates {
+        let res = res.clone();
+        let source = source.to_owned();
+        let dest = dest.to_owned();
+
+        handles.push(tokio::spawn(async move {
+            let return_flight = get_return_flights(&source.clone(), &dest.clone(), &inbound, &outbound).await;
+            match return_flight {
+                Ok(ans) => {
+                    let mut fares = ans.fares;
+                    let mut shared_data = res.lock().unwrap();
+                    shared_data.append(&mut fares);
+                }
+                Err(error) => {
+                    println!("Failed to get flights for [{inbound} -> {outbound}]\n due to {:?}", error);
+                }
+            }
+        }));
+    }
+    
+    futures::future::join_all(handles).await;
+
+    let res_fares = res.clone().lock().unwrap().clone();
+
+    return Ok(FlightResponse { fares: res_fares });
 }
 
 pub fn get_weekday_combinations(
