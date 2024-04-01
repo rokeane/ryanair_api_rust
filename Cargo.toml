@@ -1,5 +1,5 @@
 [package]
-name = "web_server"
+name = "ryanair_api"
 version = "0.1.0"
 edition = "2021"
 
