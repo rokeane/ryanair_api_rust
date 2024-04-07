@@ -5,6 +5,7 @@ use std::{fmt, thread, time};
 use chrono::prelude::*;
 use chrono::{NaiveDate, TimeDelta, Weekday};
 use std::sync::{Arc, Mutex};
+use std::cmp::Ordering;
 
 #[derive(Clone, Debug, Deserialize)]
 struct Airport {
@@ -64,6 +65,31 @@ struct Price {
     currency_code: String,
     #[serde(rename = "currencySymbol")]
     currency_symbol: String,
+}
+
+impl Eq for Price {}
+
+impl Ord for Price {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.value < other.value {
+            return Ordering::Less
+        } else if self.value > other.value {
+            return Ordering::Greater
+        }
+        Ordering::Equal
+    }
+}
+
+impl PartialOrd for Price {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Price {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -206,7 +232,9 @@ pub async fn get_cheapest_return_flights_from_weekdays(
     
     futures::future::join_all(handles).await;
 
-    let res_fares = res.clone().lock().unwrap().clone();
+    let mut res_fares = res.clone().lock().unwrap().clone();
+
+    res_fares.sort_by_key(|fare| fare.summary.price.clone());
 
     return Ok(FlightResponse { fares: res_fares });
 }
