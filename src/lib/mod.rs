@@ -2,11 +2,11 @@ mod flight_builder;
 use crate::lib::flight_builder::FlightResponse;
 
 use std::collections::HashMap;
-use std::{thread, time};
+
 use chrono::prelude::*;
 use chrono::{NaiveDate, TimeDelta, Weekday};
 use std::sync::{Arc, Mutex};
-
+use tokio::sync::Semaphore;
 
 pub async fn get_one_way_flights(
     source: &str, 
@@ -41,7 +41,6 @@ pub async fn get_one_way_flights(
             }
         }
         Err(error) => {
-            // Handle the error from the request
             println!("Request error: {:?}", error);
             return Err(Box::new(error));
         }
@@ -71,27 +70,31 @@ pub async fn get_return_flights(
 
 
 // return the cheapest return flights departing day_from and returning on day_to
-// TODO: limit the number of threads that can be spawned simultaneously
 pub async fn get_cheapest_return_flights_from_weekdays(
-    source: &str, 
-    dest: &str, 
-    from: &str, 
-    to: &str, 
+    source: &str,
+    dest: &str,
+    from: &str,
+    to: &str,
     day_from: &str,
     day_to: &str,
 ) -> Result<FlightResponse, Box<dyn std::error::Error>> {
 
     let res = Arc::new(Mutex::new(Vec::new()));
-    let dates = get_weekday_combinations(from,to,day_from,day_to);
+    let dates = get_weekday_combinations(from, to, day_from, day_to);
+
+    // limit the number of api calls that can be spawned simultaneously
+    let sem = Arc::new(Semaphore::new(25));
 
     let mut handles = vec![];
-
-    for (outbound,inbound) in dates {
+    for (outbound, inbound) in dates {
         let res = res.clone();
         let source = source.to_owned();
         let dest = dest.to_owned();
+        let sem_clone = sem.clone();
 
         handles.push(tokio::spawn(async move {
+            let permit = sem_clone.acquire().await;
+
             let return_flight = get_return_flights(&source.clone(), &dest.clone(), &inbound, &outbound).await;
             match return_flight {
                 Ok(ans) => {
@@ -103,13 +106,13 @@ pub async fn get_cheapest_return_flights_from_weekdays(
                     println!("Failed to get flights for [{inbound} -> {outbound}]\n due to {:?}", error);
                 }
             }
+            drop(permit);
         }));
     }
-    
+
     futures::future::join_all(handles).await;
 
     let mut res_fares = res.clone().lock().unwrap().clone();
-
     res_fares.sort_by_key(|fare| fare.summary.price.clone());
 
     return Ok(FlightResponse { fares: res_fares });
