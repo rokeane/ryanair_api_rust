@@ -1,2 +1,4 @@
 # Ryanair API Rust
-API for getting cheapest flights with Ryanair
+API wrapper for getting cheapest flights with Ryanair
+
+Playing around with asynchronous rust
