@@ -1,7 +1,8 @@
-use serde::{Deserialize};
-use std::cmp::Ordering;
+use serde::Deserialize;
 use serde_json::Value;
+use std::cmp::Ordering;
 use std::fmt;
+use std::ops::Add;
 
 #[derive(Clone, Debug, Deserialize)]
 struct Airport {
@@ -63,6 +64,20 @@ pub struct Price {
     currency_symbol: String,
 }
 
+impl Add for Price {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+
+        Self {
+            value: self.value + other.value,
+            value_main_unit: self.value_main_unit,
+            value_fractional_unit: self.value_fractional_unit,
+            currency_code: self.currency_code,
+            currency_symbol: self.currency_symbol,
+        }
+    }
+}
+
 impl Eq for Price {}
 
 impl Ord for Price {
@@ -106,6 +121,18 @@ pub struct FlightResponse {
     pub fares: Vec<Fare>,
 }
 
+#[derive(Clone)]
+pub struct ReturnFlight {
+    pub to_destination: Fare,
+    pub from_destination: Fare,
+    pub price: Price,
+}
+
+#[derive(Default)]
+pub struct AllReturnFlights {
+    pub flights: Vec<ReturnFlight>,
+}
+
 impl fmt::Display for FlightResponse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.fares.is_empty() {
@@ -122,6 +149,51 @@ impl fmt::Display for FlightResponse {
                 fare.summary.price.currency_symbol,
                 fare.summary.price.value,
             )?;
+        }
+        
+        Ok(())
+    }
+}
+
+impl fmt::Display for AllReturnFlights {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.flights.is_empty() {
+            return write!(f, "Sorry. No fares are available.");
+        }
+        let mut n = 1;
+        for fare in &self.flights {
+            writeln!(
+                f,
+                "{}.\nFly from {} to {}\nFly out: {}\nArrive: {}\nfor {}{}\n",
+                n,
+                fare.to_destination.outbound.departure_airport.seo_name,
+                fare.to_destination.outbound.arrival_airport.seo_name,
+                fare.to_destination.outbound.departure_date,
+                fare.to_destination.outbound.arrival_date,
+                fare.to_destination.summary.price.currency_symbol,
+                fare.to_destination.summary.price.value,
+            )?;
+
+            writeln!(
+                f,
+                "Fly back from {} to {}\nFly out: {}\nArrive: {}\nfor {}{}\n",
+                fare.from_destination.outbound.departure_airport.seo_name,
+                fare.from_destination.outbound.arrival_airport.seo_name,
+                fare.from_destination.outbound.departure_date,
+                fare.from_destination.outbound.arrival_date,
+                fare.from_destination.summary.price.currency_symbol,
+                fare.from_destination.summary.price.value,
+            )?;
+
+            writeln!(
+                f,
+                "For the total price of {}{}\n",
+                fare.price.currency_symbol,
+                fare.price.value,
+            )?;
+            
+
+            n = n + 1;
         }
         
         Ok(())
