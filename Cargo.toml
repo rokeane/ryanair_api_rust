@@ -4,6 +4,15 @@ authors = ["Ronan Keane <ronankeane269@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
 
+# Specify that we have both a library and a binary
+[lib]
+name = "ryanair_api"
+path = "src/lib/mod.rs"
+
+[[bin]]
+name = "ryanair_api_bin"
+path = "src/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
