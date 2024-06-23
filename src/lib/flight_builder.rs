@@ -1,32 +1,20 @@
 use serde::Deserialize;
-use serde_json::Value;
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::Add;
 
 #[derive(Clone, Debug, Deserialize)]
 struct Airport {
+    #[allow(dead_code)]
     #[serde(rename = "countryName")]
     country_name: String,
+    #[allow(dead_code)]
     #[serde(rename = "iataCode")]
     iata_code: String,
+    #[allow(dead_code)]
     name: String,
     #[serde(rename = "seoName")]
     seo_name: String,
-    city: City,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct City {
-    name: String,
-    code: String,
-    #[serde(rename = "countryCode")]
-    country_code: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct Flight {
-    outbound: Outbound,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -40,15 +28,6 @@ pub struct Outbound {
     departure_date: String,
     #[serde(rename = "arrivalDate")]
     arrival_date: String,
-    price: Price,
-    #[serde(rename = "flightKey")]
-    flight_key: String,
-    #[serde(rename = "flightNumber")]
-    flight_number: String,
-    #[serde(rename = "previousPrice")]
-    previous_price: Option<Value>,
-    #[serde(rename = "priceUpdated")]
-    price_updated: i64,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -112,8 +91,6 @@ pub struct Fare {
 #[derive(Clone, Debug, Deserialize)]
 pub struct Summary {
     pub price: Price,
-    #[serde(rename = "previousPrice")]
-    previous_price: Option<Value>,
 }
 
 #[derive(Default, Debug, Deserialize)]
