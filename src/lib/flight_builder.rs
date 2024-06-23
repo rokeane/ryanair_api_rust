@@ -19,7 +19,6 @@ struct Airport {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Outbound {
-    // Add other fields as needed
     #[serde(rename = "departureAirport")]
     departure_airport: Airport,
     #[serde(rename = "arrivalAirport")]
@@ -46,7 +45,6 @@ pub struct Price {
 impl Add for Price {
     type Output = Self;
     fn add(self, other: Self) -> Self {
-
         Self {
             value: self.value + other.value,
             value_main_unit: self.value_main_unit,
@@ -62,9 +60,9 @@ impl Eq for Price {}
 impl Ord for Price {
     fn cmp(&self, other: &Self) -> Ordering {
         if self.value < other.value {
-            return Ordering::Less
+            return Ordering::Less;
         } else if self.value > other.value {
-            return Ordering::Greater
+            return Ordering::Greater;
         }
         Ordering::Equal
     }
@@ -127,7 +125,7 @@ impl fmt::Display for FlightResponse {
                 fare.summary.price.value,
             )?;
         }
-        
+
         Ok(())
     }
 }
@@ -165,14 +163,12 @@ impl fmt::Display for AllReturnFlights {
             writeln!(
                 f,
                 "For the total price of {}{}\n",
-                fare.price.currency_symbol,
-                fare.price.value,
+                fare.price.currency_symbol, fare.price.value,
             )?;
-            
 
             n = n + 1;
         }
-        
+
         Ok(())
     }
 }
