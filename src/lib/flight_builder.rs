@@ -5,6 +5,8 @@ use std::{
     ops::Add,
 };
 
+use chrono::NaiveDateTime;
+
 #[derive(Clone, Debug, Deserialize)]
 struct Airport {
     #[allow(dead_code)]
@@ -167,6 +169,27 @@ impl fmt::Display for AllReturnFlights {
                 f,
                 "For the total price of {}{}\n",
                 fare.price.currency_symbol, fare.price.value,
+            )?;
+
+            let fly_out_date = NaiveDateTime::parse_from_str(
+                &fare.to_destination.outbound.departure_date,
+                "%Y-%m-%dT%H:%M:%S",
+            )
+            .unwrap();
+
+            let fly_back_date = NaiveDateTime::parse_from_str(
+                &fare.from_destination.outbound.departure_date,
+                "%Y-%m-%dT%H:%M:%S",
+            )
+            .unwrap();
+
+            writeln!(
+                f,
+                "\nhttps://www.ryanair.com/ie/en/trip/flights/select?adults=1&dateOut={}&dateIn={}&isReturn=true&originIata={}&destinationIata={}&tpAdults=1",
+                fly_out_date.date().format("%Y-%m-%d").to_string(),
+                fly_back_date.date().format("%Y-%m-%d").to_string(),
+                fare.to_destination.outbound.departure_airport.iata_code,
+                fare.to_destination.outbound.arrival_airport.iata_code,
             )?;
 
             n = n + 1;
