@@ -14,7 +14,8 @@ pub fn nominal_case() {
     );
 }
 
-// Return no combinations in case the end date never procedes the start date within the narrow time range
+// Return no combinations in case the end date never procedes the start date
+// within the narrow time range
 #[test]
 pub fn narrow_date_range_case() {
     let expected: Vec<(String, String)> = vec![];
