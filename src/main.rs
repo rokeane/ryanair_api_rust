@@ -13,20 +13,20 @@ async fn main() {
             println!("Direct Flights: {}", res);
         }
         Err(err) => {
-            println!("No response for direct flights: {err}");
+            println!("Bad response for direct flights: {err}");
         }
     };
 
-    match ryanair_api::get_return_flights(origin, destination, "2024-08-18", "2024-04-19").await {
+    match ryanair_api::get_return_flights(origin, destination, "2024-08-18", "2024-09-18").await {
         Ok(res) => {
             println!("Return Flights: {}", res);
         }
         Err(err) => {
-            println!("No response for return flights: {err}");
+            println!("Bad response for return flights: {err}");
         }
     };
 
-    match ryanair_api::get_cheapest_return_flights_from_weekdays(
+    let cheapest_flights = ryanair_api::get_cheapest_return_flights_from_weekdays(
         origin,
         destination,
         "2024-08-17",
@@ -34,13 +34,7 @@ async fn main() {
         "monday",
         "sunday",
     )
-    .await
-    {
-        Ok(res) => {
-            println!("All Possible Flights:\n{}", res);
-        }
-        Err(err) => {
-            println!("No response for all return flights: {err}");
-        }
-    };
+    .await;
+
+    println!("Cheapest Return Flights {cheapest_flights}");
 }

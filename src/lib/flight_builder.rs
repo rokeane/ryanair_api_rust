@@ -1,7 +1,9 @@
 use serde::Deserialize;
-use std::cmp::Ordering;
-use std::fmt;
-use std::ops::Add;
+use std::{
+    cmp::Ordering,
+    fmt,
+    ops::Add,
+};
 
 #[derive(Clone, Debug, Deserialize)]
 struct Airport {
@@ -45,6 +47,7 @@ pub struct Price {
 impl Add for Price {
     type Output = Self;
     fn add(self, other: Self) -> Self {
+        assert!(self.currency_code == other.currency_code);
         Self {
             value: self.value + other.value,
             value_main_unit: self.value_main_unit,

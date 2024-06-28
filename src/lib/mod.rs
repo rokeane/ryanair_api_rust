@@ -1,14 +1,25 @@
 mod flight_builder;
-use flight_builder::AllReturnFlights;
-use flight_builder::FlightResponse;
-use flight_builder::ReturnFlight;
+use flight_builder::{
+    AllReturnFlights,
+    FlightResponse,
+    ReturnFlight,
+};
 
-use std::collections::HashMap;
+use chrono::{
+    prelude::*,
+    NaiveDate,
+    TimeDelta,
+    Weekday,
+};
 
-use chrono::prelude::*;
-use chrono::{NaiveDate, TimeDelta, Weekday};
-
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    error::Error,
+    sync::{
+        Arc,
+        Mutex,
+    },
+};
 use tokio::sync::Semaphore;
 
 pub async fn get_one_way_flights(
@@ -16,6 +27,12 @@ pub async fn get_one_way_flights(
     dest: &str,
     departure_date: &str,
 ) -> Result<FlightResponse, Box<dyn std::error::Error>> {
+    assert!(
+        NaiveDate::parse_from_str(departure_date, "%Y-%m-%d").is_ok(),
+        "{}",
+        format!("This date is not legit: {}", departure_date)
+    );
+
     let mut params: HashMap<&str, &str> = HashMap::new();
 
     params.insert("departureAirportIataCode", source);
@@ -58,17 +75,29 @@ pub async fn get_return_flights(
     departure_date: &str,
     return_date: &str,
 ) -> Result<AllReturnFlights, Box<dyn std::error::Error>> {
-    let flights_to_dest = get_one_way_flights(source, dest, departure_date)
-        .await?
-        .fares;
+    let flights_to_dest = match get_one_way_flights(source, dest, departure_date).await {
+        Ok(result) => result.fares,
+        Err(err) => {
+            let error_message = Box::<dyn Error>::from(format!(
+                "Flight to destination on {} failed: {}",
+                departure_date, err
+            ));
+            return Err(error_message);
+        }
+    };
 
-    let flights_from_dest = get_one_way_flights(dest, source, return_date).await?.fares;
+    let flights_from_dest = match get_one_way_flights(dest, source, return_date).await {
+        Ok(result) => result.fares,
+        Err(err) => {
+            let error_message = Box::<dyn Error>::from(format!(
+                "Flight from destination on {} failed: {}",
+                return_date, err
+            ));
+            return Err(error_message);
+        }
+    };
 
     let mut result: AllReturnFlights = Default::default();
-
-    if flights_to_dest.is_empty() || flights_from_dest.is_empty() {
-        return Ok(result);
-    }
 
     for to_dest in &flights_to_dest {
         for from_dest in &flights_from_dest {
@@ -93,7 +122,10 @@ pub async fn get_cheapest_return_flights_from_weekdays(
     to: &str,
     day_from: &str,
     day_to: &str,
-) -> Result<AllReturnFlights, Box<dyn std::error::Error>> {
+) -> AllReturnFlights {
+    assert!(NaiveDate::parse_from_str(from, "%Y-%m-%d").is_ok());
+    assert!(NaiveDate::parse_from_str(to, "%Y-%m-%d").is_ok());
+
     let res = Arc::new(Mutex::new(Vec::new()));
     let dates = get_weekday_combinations(from, to, day_from, day_to);
 
@@ -110,17 +142,23 @@ pub async fn get_cheapest_return_flights_from_weekdays(
         handles.push(tokio::spawn(async move {
             let permit = sem_clone.acquire().await;
 
-            let mut return_flights = get_return_flights(
+            match get_return_flights(
                 &source.clone(),
                 &dest.clone(),
                 &departure_date,
                 &return_date,
             )
             .await
-            .unwrap()
-            .flights;
-            let mut shared_data = res.lock().unwrap();
-            shared_data.append(&mut return_flights);
+            {
+                Ok(result) => {
+                    let mut return_flights = result.flights;
+                    let mut shared_data = res.lock().unwrap();
+                    shared_data.append(&mut return_flights);
+                }
+                Err(err) => {
+                    panic!("{}", err);
+                }
+            }
 
             drop(permit);
         }));
@@ -131,7 +169,7 @@ pub async fn get_cheapest_return_flights_from_weekdays(
     let mut res_fares = res.clone().lock().unwrap().clone();
     res_fares.sort_by_key(|fare| fare.price.clone());
 
-    return Ok(AllReturnFlights { flights: res_fares });
+    return AllReturnFlights { flights: res_fares };
 }
 
 pub fn get_weekday_combinations(
